@@ -141,9 +141,47 @@ test('can read objects from _read (sync)', function(t) {
   }));
 });
 
+test('NO_DATA is not readable but continues allowing calls to _read (sync)', function(t) {
+  var r = new Readable({ objectMode: true });
+  var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, { two: '2' }, r.NO_DATA];
+  r._read = function(n) {
+    var item = list.shift();
+    r.push(item || null);
+  };
+
+  r.pipe(toArray(function(list) {
+    assert.deepEqual(list, [
+      { one: '1' },
+      { two: '2' }
+    ]);
+
+    t.end();
+  }));
+});
+
 test('can read objects from _read (async)', function(t) {
   var r = new Readable({ objectMode: true });
   var list = [{ one: '1'}, { two: '2' }];
+  r._read = function(n) {
+    var item = list.shift();
+    process.nextTick(function() {
+      r.push(item || null);
+    });
+  };
+
+  r.pipe(toArray(function(list) {
+    assert.deepEqual(list, [
+      { one: '1' },
+      { two: '2' }
+    ]);
+
+    t.end();
+  }));
+});
+
+test('NO_DATA is not readable but continues allowing calls to _read (async)', function(t) {
+  var r = new Readable({ objectMode: true });
+  var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, { two: '2' }, r.NO_DATA];
   r._read = function(n) {
     var item = list.shift();
     process.nextTick(function() {
@@ -244,6 +282,35 @@ test('high watermark _read', function(t) {
   t.end();
 });
 
+test('high watermark _read unaffected by pushing NO_DATA', function(t) {
+  var r = new Readable({
+    highWaterMark: 6,
+    objectMode: true
+  });
+  var calls = 0;
+  var list = [r.NO_DATA, '1', r.NO_DATA, '2', '3', '4', r.NO_DATA, r.NO_DATA, '5', '6', '7', '8', r.NO_DATA];
+
+  r._read = function(n) {
+    calls++;
+  };
+
+  list.forEach(function(c) {
+    r.push(c);
+  });
+
+  var v = r.read();
+
+  assert.equal(calls, 0);
+  assert.equal(v, '1');
+
+  var v2 = r.read();
+
+  assert.equal(calls, 1);
+  assert.equal(v2, '2');
+
+  t.end();
+});
+
 test('high watermark push', function(t) {
   var r = new Readable({
     highWaterMark: 6,
@@ -253,6 +320,22 @@ test('high watermark push', function(t) {
   for (var i = 0; i < 6; i++) {
     var bool = r.push(i);
     assert.equal(bool, i === 5 ? false : true);
+  }
+
+  t.end();
+});
+
+test('high watermark push unaffected by pushing NO_DATA', function(t) {
+  var r = new Readable({
+    highWaterMark: 6,
+    objectMode: true
+  });
+  r._read = function(n) {};
+  for (var i = 0; i < 6; i++) {
+    var bool = r.push(i);
+    var bool2 = r.push(r.NO_DATA);
+    assert.equal(bool, i === 5 ? false : true);
+    assert.equal(bool2, bool);
   }
 
   t.end();
