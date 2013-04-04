@@ -141,9 +141,45 @@ test('can read objects from _read (sync)', function(t) {
   }));
 });
 
+test('non object version NO_DATA is not readable but continues allowing calls to _read (sync)', function(t) {
+  var r = new Readable({ objectMode: false });
+  r.setEncoding('utf8');
+  //var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, { two: '2' }, r.NO_DATA];
+  //var list = ['', 'one-1', '', '', 'two-2', ''];
+  var list = ['', 'one-1', '', 'two-2', ''];
+  // TODO: why do interspersed '' work but doubled '' not work; should they? should any such thing work in sync mode?
+  // TODO: doubled should not work to prevent an infinite loop; there is a comment in maybeReadMore_, but that code is never reached in this case so I'm not sure which code is actually doing it
+  r._read = function(n) {
+    var item = list.shift();
+    var self = this;
+    r.push((item || item === '') ?
+           item :
+           null);
+  };
+
+/*
+  r.read(); // make test end, even if it fails
+  r.read(); // make test end, even if it fails
+  r.read(); // make test end, even if it fails
+  r.read(); // make test end, even if it fails
+*/
+  r.pipe(toArray(function(list) {
+    assert.deepEqual(list, [
+      'one-1',
+      'two-2'
+    ]);
+
+    //assert(false);
+    t.end();
+  }));
+});
+
 test('NO_DATA is not readable but continues allowing calls to _read (sync)', function(t) {
   var r = new Readable({ objectMode: true });
+  //var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, r.NO_DATA, { two: '2' }, r.NO_DATA];
   var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, { two: '2' }, r.NO_DATA];
+  // TODO: why do interspersed NO_DATA work but doubled NO_DATA not work; should they? should any such thing work in sync mode?
+  // TOOD: presumably identical to the non object mode test above
   r._read = function(n) {
     var item = list.shift();
     r.push(item || null);
@@ -179,13 +215,54 @@ test('can read objects from _read (async)', function(t) {
   }));
 });
 
-test('NO_DATA is not readable but continues allowing calls to _read (async)', function(t) {
-  var r = new Readable({ objectMode: true });
-  var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, { two: '2' }, r.NO_DATA];
+test('non object version NO_DATA is not readable but continues allowing calls to _read (async)', function(t) {
+  var r = new Readable({ objectMode: false });
+  r.setEncoding('utf8');
+  //var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, { two: '2' }, r.NO_DATA];
+  var list = ['', 'one-1', '', '', 'two-2', ''];
+  //var list = ['', 'one-1', '', '', '', 'two-2', ''];
+  var list = ['', 'one-1', '', 'two-2', ''];
+  //var list = ['one-1', '', 'two-2', ''];
+  //var list = ['one-1', 'two-2', ''];
+  //var list = ['one-1', 'two-2'];
+  // TODO: doubled '' works here because the test's _read keeps calling self.read(0)
   r._read = function(n) {
     var item = list.shift();
+    var self = this;
+    process.nextTick(function() {
+      r.push((item || item === '') ?
+             item :
+             null);
+      if(item === '') {
+        // at some future time, let stream know the source has data now
+        //setTimeout(function() {self.read(0);}, 0);
+      }
+    });
+  };
+
+  r.pipe(toArray(function(list) {
+    assert.deepEqual(list, [
+      'one-1',
+      'two-2'
+    ]);
+
+    assert(false);
+    t.end();
+  }));
+});
+
+test('NO_DATA is not readable but continues allowing calls to _read (async)', function(t) {
+  var r = new Readable({ objectMode: true });
+  var list = [r.NO_DATA, { one: '1'}, r.NO_DATA, r.NO_DATA, { two: '2' }, r.NO_DATA];
+  r._read = function(n) {
+    var item = list.shift();
+    var self = this;
     process.nextTick(function() {
       r.push(item || null);
+      if(item === r.NO_DATA) {
+        // at some future time, let stream know the source has data now
+        setTimeout(function() {self.read(0);}, 0);
+      }
     });
   };
 
