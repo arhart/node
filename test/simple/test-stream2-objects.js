@@ -486,3 +486,46 @@ test('buffers finish until cb is called', function(t) {
   w.write('foo');
   w.end();
 });
+
+test('reading is set to false by push(NO_DATA) - sync', function(t) {
+  var r = new Readable({objectMode: true});
+  r._read = function(n) {
+    assert.ok(r._readableState.reading);
+    r.push(r.NO_DATA);
+    setTimeout(function() {
+      assert.ok(!r._readableState.reading);
+      t.end();
+    }, 20);
+  };
+  r.read();
+});
+
+test('reading is set to false by push(NO_DATA) - async nextTick', function(t) {
+  var r = new Readable({objectMode: true});
+  r._read = function(n) {
+    process.nextTick(function() {
+      assert.ok(r._readableState.reading);
+      r.push(r.NO_DATA);
+      setTimeout(function() {
+        assert.ok(!r._readableState.reading);
+        t.end();
+      }, 20);
+    });
+  };
+  r.read();
+});
+
+test('reading is set to false by push(NO_DATA) - async short timeout', function(t) {
+  var r = new Readable({objectMode: true});
+  r._read = function(n) {
+    setTimeout(function() {
+      assert.ok(r._readableState.reading);
+      r.push(r.NO_DATA);
+      setTimeout(function() {
+        assert.ok(!r._readableState.reading);
+        t.end();
+      }, 20);
+    }, 20);
+  };
+  r.read();
+});
