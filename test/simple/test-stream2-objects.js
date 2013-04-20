@@ -486,3 +486,24 @@ test('buffers finish until cb is called', function(t) {
   w.write('foo');
   w.end();
 });
+
+test('reading is set to false by push(NO_DATA) - sync', function(t) {
+  var r = new Readable({
+    objectMode: true
+    }
+  });
+  r._read = function(n) {
+    this.push(this.NO_DATA);
+    setTimeout(function() {
+      assert.r.
+    });
+  };
+  for (var i = 0; i < 6; i++) {
+    var bool = r.push(i);
+    var bool2 = r.push(r.NO_DATA);
+    assert.equal(bool, i === 5 ? false : true);
+    assert.equal(bool2, bool);
+  }
+
+  t.end();
+});
